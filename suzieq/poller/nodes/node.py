@@ -654,14 +654,12 @@ class Node(object):
                     login_timeout=self.connect_timeout,
                     password=self.password if not self.pvtkey else None,
                     known_hosts=None,
-                    config=self.ssh_config_file
                 )
             else:
                 options = asyncssh.SSHClientConnectionOptions(
                     client_keys=self.pvtkey if self.pvtkey else None,
                     login_timeout=self.connect_timeout,
                     password=self.password if not self.pvtkey else None,
-                    config=self.ssh_config_file,
                 )
 
             if self.jump_host_key_file:
@@ -670,13 +668,11 @@ class Node(object):
                         client_keys=self.jump_host_key_file,
                         login_timeout=self.connect_timeout,
                         known_hosts=None,
-                        config=self.ssh_config_file,
                     )
                 else:
                     jump_host_options = asyncssh.SSHClientConnectionOptions(
                         client_keys=self.jump_host_key_file,
-                        login_timeout=self.connect_timeout,
-                        config=self.ssh_config_file,
+                        login_timeout=self.cmd_timeout,
                     )
             else:
                 jump_host_options = options
@@ -708,12 +704,17 @@ class Node(object):
                 return
 
             try:
-                self._conn = await asyncssh.connect(
-                    self.address,
-                    username=self.username,
-                    port=self.port,
-                    options=options)
+                connect_args = {
+                    "username": self.username,
+                    #"port": self.port,
+                    #"options": options,
+                }
 
+                if self.ssh_config_file:
+                    connect_args["config"] = self.ssh_config_file
+
+                breakpoint()
+                self._conn = await asyncssh.connect(self.address, **connect_args)
                 self.logger.info(
                     f"Connected to {self.address}:{self.port} at {time.time()}")
                 if init_boot_time:
