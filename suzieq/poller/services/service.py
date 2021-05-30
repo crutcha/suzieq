@@ -656,7 +656,6 @@ class Service(object):
                     continue
 
                 try:
-                    breakpoint()
                     result = self.process_data(output)
                 except Exception:
                     self.logger.exception(

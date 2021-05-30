@@ -713,7 +713,6 @@ class Node(object):
                 if self.ssh_config_file:
                     connect_args["config"] = self.ssh_config_file
 
-                breakpoint()
                 self._conn = await asyncssh.connect(self.address, **connect_args)
                 self.logger.info(
                     f"Connected to {self.address}:{self.port} at {time.time()}")
