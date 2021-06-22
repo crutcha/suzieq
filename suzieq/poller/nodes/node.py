@@ -667,7 +667,7 @@ class Node(object):
             connect_args["port"] = self.port
 
         self.logger.info(
-            f"Creating SSH Client for {self.address}:{self.port}")``
+            f"Creating SSH Client for {self.address}:{self.port}")
         ssh_options = asyncssh.SSHClientConnectionOptions(**connect_options)
         client = await asyncssh.connect(self.address, **connect_args)
 
