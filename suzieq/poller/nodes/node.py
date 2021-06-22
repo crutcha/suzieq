@@ -226,9 +226,6 @@ class Node(object):
         self._last_exception_timestamp = int(time.time()*1000)
 
     async def _init(self, **kwargs):
-        #import traceback
-        #traceback.print_stack()
-        #breakpoint()
         if not kwargs:
             raise ValueError
 
@@ -239,7 +236,6 @@ class Node(object):
         self.nsname = None
         self.svc_cmd_mapping = defaultdict(lambda: {})  # Not used yet
         self.logger = logging.getLogger(__name__)
-        self.port = 0
         self.backoff = 15  # secs to backoff
         self.init_again_at = 0  # after this epoch secs, try init again
         self.connect_timeout = kwargs.get('connect_timeout', 15)
@@ -630,6 +626,7 @@ class Node(object):
         if self._conn:
             self._conn.close()
             await self._conn.wait_closed()
+        # TODO: remove. this is redundant
         if self._tunnel:
             self._tunnel.close()
             await self._tunnel.wait_closed()
@@ -647,78 +644,42 @@ class Node(object):
         if not self._service_queue:
             self._service_queue = asyncio.Queue()
 
+    async def _create_ssh_client(self) -> asyncssh.SSHClientConnection:
+        self.logger.warning("CALLED CREATE_SSH_CLIENT")
+        #import traceback
+        #traceback.print_stack()
+        connect_options = {
+            "login_timeout": self.cmd_timeout,
+            "known_hosts": self.ignore_known_hosts,
+        }
+        connect_args = {"username": self.username}
+
+        if self.pvtkey:
+            connect_options["client_keys"] = self.pvtkey
+        elif self.password:
+            connect_options["password"] = self.password
+
+        # TODO: tunnel instead of ssh config file
+        if self.ssh_config_file:
+            connect_args["config"] = self.ssh_config_file
+
+        if self.port:
+            connect_args["port"] = self.port
+
+        self.logger.info(
+            f"Creating SSH Client for {self.address}:{self.port}")``
+        ssh_options = asyncssh.SSHClientConnectionOptions(**connect_options)
+        client = await asyncssh.connect(self.address, **connect_args)
+
+        return client
+
     async def _init_ssh(self, init_boot_time=True, rel_lock=True) -> None:
+        self.logger.warning("CALLED INIT_SSH")
         await self.ssh_ready.wait()
         if not self._conn:
             self.ssh_ready.clear()
-            if self.ignore_known_hosts:
-                options = asyncssh.SSHClientConnectionOptions(
-                    client_keys=self.pvtkey if self.pvtkey else None,
-                    login_timeout=self.connect_timeout,
-                    password=self.password if not self.pvtkey else None,
-                    known_hosts=None,
-                )
-            else:
-                options = asyncssh.SSHClientConnectionOptions(
-                    client_keys=self.pvtkey if self.pvtkey else None,
-                    login_timeout=self.connect_timeout,
-                    password=self.password if not self.pvtkey else None,
-                )
-
-            if self.jump_host_key_file:
-                if self.ignore_known_hosts:
-                    jump_host_options = asyncssh.SSHClientConnectionOptions(
-                        client_keys=self.jump_host_key_file,
-                        login_timeout=self.connect_timeout,
-                        known_hosts=None,
-                    )
-                else:
-                    jump_host_options = asyncssh.SSHClientConnectionOptions(
-                        client_keys=self.jump_host_key_file,
-                        login_timeout=self.cmd_timeout,
-                    )
-            else:
-                jump_host_options = options
-
             try:
-                if self.jump_host:
-                    self.logger.info(
-                        'Using jump host: {}, with username: {}, and port: {}'
-                        .format(self.jump_host, self.jump_user, self.jump_port)
-                    )
-                    self._tunnel = await asyncssh.connect(
-                        self.jump_host, port=self.jump_port,
-                        options=jump_host_options, username=self.jump_user)
-                    self.logger.info(
-                        f'Connection to jump host {self.jump_host} succeeded')
-
-            except Exception as e:
-                if self.sigend:
-                    self._terminate()
-                    return
-                self.logger.error(
-                    f"ERROR: Cannot connect to jump host: {self.jump_host}, "
-                    f" {str(e)}")
-                self.last_exception = e
-                self._conn = None
-                self._tunnel = None
-                if rel_lock:
-                    self.ssh_ready.set()
-                return
-
-            try:
-                connect_args = {
-                    "username": self.username,
-                    #"port": self.port,
-                    #"options": options,
-                }
-
-                if self.ssh_config_file:
-                    connect_args["config"] = self.ssh_config_file
-
-                self._conn = await asyncssh.connect(self.address, **connect_args)
-                self.logger.info(
-                    f"Connected to {self.address}:{self.port} at {time.time()}")
+                self._conn = await self._create_ssh_client()
                 if init_boot_time:
                     await self.init_boot_time()
                 elif rel_lock:
@@ -731,10 +692,8 @@ class Node(object):
                                   f"{self.address}:{self.port}, {str(e)}")
                 self.last_exception = e
                 self._conn = None
-                self._tunnel = None
                 if rel_lock:
                     self.ssh_ready.set()
-        return
 
     def _create_error(self, cmd) -> dict:
         data = {'error': str(self.last_exception)}
