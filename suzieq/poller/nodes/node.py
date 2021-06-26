@@ -645,9 +645,6 @@ class Node(object):
             self._service_queue = asyncio.Queue()
 
     async def _create_ssh_client(self) -> asyncssh.SSHClientConnection:
-        self.logger.warning("CALLED CREATE_SSH_CLIENT")
-        #import traceback
-        #traceback.print_stack()
         connect_options = {
             "login_timeout": self.cmd_timeout,
             "known_hosts": self.ignore_known_hosts,

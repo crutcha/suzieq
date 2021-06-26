@@ -22,16 +22,19 @@ async def test_node_stuff(mocker):
         "namespace": "eos",
         "ignore_known_hosts": None,
     }
+    expected_connect_arguments = {
+        "username": "test-user",
+        "config": "/Users/test-user/.ssh/config",
+        "port": 22,
+    }
 
     asyncssh_mock = MagicMock(spec=asyncssh.SSHClientConnection)
     future = asyncio.Future()
     future.set_result(asyncssh_mock)
     mock_connect = mocker.patch.object(asyncssh, "connect", return_value=future)
 
-    #breakpoint()
-    test_node = await Node()._init(**mock_kwargs)
-    #await test_node._create_ssh_client()
+    await Node()._init(**mock_kwargs)
 
-    breakpoint()
     assert mock_connect.call_count == 1
-    print("here")
+    assert mock_connect.call_args[0][0] == "test-device"
+    assert mock_connect.call_args[1] == expected_connect_arguments
